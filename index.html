@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<script src="./scripts/jquery.1.7.1.min.js" type="text/javascript" language="javascript"></script>
+		<script src="./scripts/knockout.2.0.0.js" type="text/javascript" language="javascript"></script>
+		<script src="./scripts/knockout.view.js" type="text/javascript" language="javascript"></script>
+		<script type="text/javascript" language="javascript">
+			$(function() {
+				var layoutViewModel = (function()
+				{
+					var layoutViewModel = function()
+					{
+						if( !(this instanceof layoutViewModel) ) return new layoutViewModel();
+
+						this.contentViewModel = ko.observable(null);
+						this.contentTemplate = ko.observable(null);
+
+						this.firstName = ko.observable("Rick");
+						this.lastName = ko.observable("Allen");
+						this.name = ko.computed(function() {
+							return this.firstName() + " " + this.lastName();
+						}, this);
+					};
+
+					return layoutViewModel;
+				})();
+
+
+
+				var pageViewModel = (function()
+				{
+					var pageViewModel = function()
+					{
+						if( !(this instanceof pageViewModel) ) return new pageViewModel();
+
+						this.pageName = ko.observable("Loaded Template");
+						this.goBackToTemplate = function()
+						{
+							$root.contentTemplate("#templateTemplate");
+							$root.contentViewModel( new templateViewModel() );
+						}
+					};
+
+					return pageViewModel;
+				})();
+
+
+
+				var templateViewModel = (function()
+				{
+					var templateViewModel = function()
+					{
+						if( !(this instanceof templateViewModel) ) return new templateViewModel();
+
+						this.pageName = ko.observable("Inline Template");
+						this.loadPage = function()
+						{
+							//NOTE: Usually we wouldn't change views and states from an internal viewModel method
+							// instead we should be watching the URL change and update accordingly, oh well
+							$root.contentTemplate("./pageTemplate.html");
+							$root.contentViewModel(new pageViewModel());
+						};
+					};
+
+					return templateViewModel;
+				})();
+
+				//setup the initial view and viewmodel
+				var $root = new layoutViewModel();
+
+				//some initialization script
+				$("template").each(function(index, element)
+				{
+					var $element = $(element);
+					var $script = $(
+						"<" + "script/>"
+					).attr(
+						"id", $element.attr("id")
+					).attr(
+						"type", "text/template"
+					).html(
+						$element.html()
+					);
+
+					$element.before($script)
+					$element.remove()
+				});
+
+				ko.applyBindings($root);
+
+				$root.contentViewModel( new templateViewModel() );
+				$root.contentTemplate( "#templateTemplate" );
+			});
+		</script>
+		<style>
+		</style>
+	</head>
+	<body>
+		<header>
+			<span data-bind="text: name"></span>
+		</header>
+		<section data-bind="view: {viewModel: contentViewModel, template: contentTemplate}">
+			Loading...
+		</section>
+		<template id="templateTemplate">
+			<h1>You're looking at a script template</h1>
+			<h3>
+				Welcome <span data-bind="text: $root.name"></span> 
+				you're on <span data-bind="text: pageName"></span>
+			</h3>
+			<hr/>
+			<ul>
+				<li>First Name: <input type="text" data-bind="value: $root.firstName" /></li>
+				<li>Last Name: <input type="text" data-bind="value: $root.lastName" /></li>
+				<li><a href="javascript:void(0)" data-bind="click: loadPage">Click here to load a template from the server "/pageTemplate.html"</a></li>
+			</ul>
+			<hr/>
+			<p>Houston, that may have seemed like a very long final phase. The autotargeting was taking us right into a ... crater, with a large number of big boulders and rocks ... and it required ... flying manually over the rock field to find a reasonably good area.</p>
+			<p>The surface is fine and powdery. I can kick it up loosely with my toe. It does adhere in fine layers, like powdered charcoal, to the sole and sides of my boots. I only go in a small fraction of an inch, maybe an eighth of an inch, but I can see the footprints of my boots and the treads in the fine, sandy particles. There seems to be no difficult in moving around, as we suspected.</p>
+			<p>Let's light this fire one more time, Mike, and witness this great nation at its best.</p>
+			<p>The vehicle explodes, literally explodes, off the pad. The simulator shakes you a little bit, but the actual liftoff shakes your entire body and soul.</p>
+		</template>
+		<footer>
+		</footer>
+	</body>
+</html>
