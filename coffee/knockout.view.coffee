@@ -1,86 +1,62 @@
 isObject = (object) -> ( typeof object == typeof {} );
-isFunction = (object) -> Object::toString.call( object ) is "[object Function]"
-isArray = (object) -> Object::toString.call( object ) is "[object Array]"
-isString = (object) -> Object::toString.call( object ) is "[object String]"
-trim = (str) -> str.replace(/^\s\s*/, '').replace(/\s\s*$/, '')
-leftTrim = (str) -> str.replace(/^\s+/,'')
-rightTrim = (str) -> str.replace(/\s+$/,'')
-startsWith = (haystack, needle) -> haystack.indexOf(needle) is 0
-endsWith = (haystack, needle) ->  haystack.indexOf(needle, haystack.length - needle.length) isnt -1
-unwrap = (val) -> if isFunction val then val() else val
-#unwrap = ko.utils.unwrapObservable
-#Add a knockout binding for views
-ko.bindingHandlers["view"] = (() ->
-	templates = {}
+defer = (callback) -> setTimeout(callback,1)
 
-	makeTemplateValueAccessor = (valueAccessor) ->
+#Add a knockout binding for views
+ko.bindingHandlers["view"] = ( ->
+
+	makeTemplateValueAccessor = (viewModel) ->
 		() ->
-			value = unwrap valueAccessor
 			return {
-				'if': value
-				'data': value
+				'if': viewModel
+				'data': viewModel
 				'templateEngine': ko.nativeTemplateEngine.instance
 			}
-	
-	'init': (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) ->
-		value = unwrap valueAccessor
+
+	'init': (element, valueAccessor) ->
+		value = valueAccessor()
 		value = {} unless isObject value
-		value.template ?= null
-		value.viewModel ?= null
+
+		viewModel = ko.utils.unwrapObservable(value.viewModel)
 
 		ko.bindingHandlers['template']['init'](
-			element, 
-			makeTemplateValueAccessor(value.viewModel)
+			element,
+			makeTemplateValueAccessor(viewModel)
 		)
-	
-	'update': (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) ->
-		value = unwrap valueAccessor
+
+	'update': (element, valueAccessor, args...) ->
+		value = valueAccessor()
 		value = {} unless isObject value
-		value.template ?= null
-		value.viewModel ?= null
 
-		return if value.template is null
-		return if value.viewModel is null
+		return if not value.template?
+		return if not value.viewModel?
 
-		template = unwrap(value.template)
-		
-		if not template?
-			$(element).html("")
-		else
-			if templates[template]?
-				ko.utils.domData.set(element, '__ko_anon_template__', templates[template])
-				ko.bindingHandlers['template']['update'](
-					element, 
-					makeTemplateValueAccessor(value.viewModel), 
-					allBindingsAccessor, 
-					viewModel, 
-					bindingContext
-				)
-			
-			else if startsWith(template, '#')
-				templates[template] = $(template).html()
+		return if ko.utils.domData.get(element, '__ko_view_updating__') is true
+		ko.utils.domData.set(element, '__ko_view_updating__', true)
 
-				ko.utils.domData.set(element, '__ko_anon_template__', templates[template])
-				ko.bindingHandlers['template']['update'](
-					element, 
-					makeTemplateValueAccessor(value.viewModel), 
-					allBindingsAccessor, 
-					viewModel, 
-					bindingContext
-				)
+		defer ->
+			template = ko.utils.unwrapObservable(value.template)
+			execScripts = !!ko.utils.unwrapObservable(value.execScripts)
+
+			if not template?
+				$(element).html("")
 			else
-				$.get( 
-					template, 
-					(data) -> 
-						templates[template] = data
-						
-						ko.utils.domData.set(element, '__ko_anon_template__', templates[template])
-						ko.bindingHandlers['template']['update'](
-							element, 
-							makeTemplateValueAccessor(value.viewModel), 
-							allBindingsAccessor, 
-							viewModel, 
-							bindingContext
-						)
+				originalTemplate = ko.utils.domData.get(element, '__ko_anon_template__')
+				ko.utils.domData.set(element, '__ko_anon_template__', template)
+
+				ko.bindingHandlers['template']['update'](
+					element,
+					makeTemplateValueAccessor(value.viewModel),
+					args...
 				)
+
+				if template isnt originalTemplate and execScripts is true
+					$(element).find("script").each( (index, script) ->
+						script = $(script)
+						eval( script.text() ) if script.attr('type').toLowerCase() is "text/javascript"
+					)
+				#END if template updated
+			#END if not template?
+
+			ko.utils.domData.set(element, '__ko_view_updating__', false)
+		#END defer
 )()
